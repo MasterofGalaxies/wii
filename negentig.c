@@ -100,8 +100,6 @@ static void partition_read_block(u64 blockno, u8 *block)
 	// XXX: check H0, H1, H2 here
 
 	memcpy(iv, raw + 0x3d0, 16);
-//fprintf(stderr, "ky: "); print_bytes(disc_key, 16); fprintf(stderr, "\n");
-//fprintf(stderr, "iv: "); print_bytes(iv, 16); fprintf(stderr, "\n");
 	aes_cbc_dec(disc_key, iv, raw + 0x400, 0x7c00, block);
 }
 
@@ -300,8 +298,10 @@ static void do_files(void)
 	fprintf(stderr, "\tDOL @ %09llx\n", dol_offset);
 	fprintf(stderr, "\tFST @ %09llx (size %08x)\n", fst_offset, fst_size);
 
-	copy_file("###apl###", 0x2440, dol_offset - 0x2440); // XXX: wrong way to get this size, there is a header
-	copy_file("###dol###", dol_offset, fst_offset - dol_offset); // XXX: similar, perhaps
+	copy_file("###apl###", 0x2440, dol_offset - 0x2440);
+		// XXX: wrong way to get this size, there is a header
+	copy_file("###dol###", dol_offset, fst_offset - dol_offset);
+		// XXX: similar, perhaps
 
 	fst = malloc(fst_size);
 	partition_read(fst_offset, fst, fst_size);
