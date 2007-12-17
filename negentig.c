@@ -11,6 +11,7 @@
 #include <stdio.h>
 
 static int dump_partition_data = 0;
+static int decompress_yaz0 = 1;
 
 #define SPINNER_SPEED 64
 
@@ -19,14 +20,14 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
-FILE *disc_fp;
+static FILE *disc_fp;
 
-u64 partition_raw_offset;
-u64 partition_data_offset;
-u64 partition_data_size;
-u8 h3[0x18000];
+static u64 partition_raw_offset;
+static u64 partition_data_offset;
+static u64 partition_data_size;
+static u8 h3[0x18000];
 
-u8 disc_key[16];
+static u8 disc_key[16];
 
 static void print_bytes(u8 *x, u32 n)
 {
@@ -197,11 +198,78 @@ static void do_data(u64 size)
 	fclose(fp);
 }
 
+static void do_yaz0_file(const char *name, u64 offset, u32 compressed_size,
+                         u32 uncompressed_size)
+{
+	u8 hist[0x1000];
+	u32 out;
+	char name_unc[256];
+	u8 *data;
+	u8 *in;
+	u8 bits;
+	u32 nbits;
+	u32 n, d, i;
+	FILE *fp;
+
+	snprintf(name_unc, sizeof name_unc, "%s###yaz###", name);
+	fp = fopen(name_unc, "wb");
+	data = malloc(compressed_size);
+	partition_read(offset, data, compressed_size);
+
+	nbits = 0;
+	in = data + 0x10;
+	for (out = 0; out < uncompressed_size; ) {
+		if (nbits == 0) {
+			bits = *in++;
+			nbits = 8;
+		}
+
+		if ((bits & 0x80) != 0) {
+			hist[out++ % 0x1000] = *in++;
+			if (out % 0x1000 == 0)
+				fwrite(hist, 1, 0x1000, fp);
+		} else {
+			n = *in++;
+			d = *in++;
+			d |= (n << 8) & 0xf00;
+			n >>= 4;
+			if (n == 0)
+				n = 0x10 + *in++;
+			n += 2;
+
+			for (i = 0; i < n; i++) {
+				hist[out % 0x1000] = hist[(out - d - 1) % 0x1000];
+				out++;
+				if (out % 0x1000 == 0)
+					fwrite(hist, 1, 0x1000, fp);
+			}
+		}
+
+		nbits--;
+		bits <<= 1;
+	};
+
+	if (out % 0x1000 != 0)
+		fwrite(hist, 1, out % 0x1000, fp);
+
+	free(data);
+	fclose(fp);
+}
+
 static void copy_file(const char *name, u64 offset, u64 size)
 {
 	u8 data[0x80000];
 	FILE *fp;
 	u32 block_size;
+
+	if (decompress_yaz0 && size >= 8) {
+		partition_read(offset, data, 8);
+		if (memcmp(data, "Yaz0", 4) == 0) {
+			do_yaz0_file(name, offset, size, be32(data + 4));
+
+			return;
+		}
+	}
 
 	fp = fopen(name, "wb");
 
@@ -269,7 +337,8 @@ static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
 	} else {
 		offset = be34(fst + 12*i + 4);
 
-		fprintf(stderr, " @ %09llx, size %08x\n", offset, size);
+		//fprintf(stderr, " @ %09llx, size %08x\n", offset, size);
+		fprintf(stderr, "\n");
 
 		copy_file(name, offset, size);
 
