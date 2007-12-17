@@ -10,15 +10,15 @@
 #include <string.h>
 #include <stdio.h>
 
-static int dump_partition_data = 0;
-static int decompress_yaz0 = 1;
-
-#define SPINNER_SPEED 64
-
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
+
+static int dump_partition_data = 0;
+static u32 max_size_to_auto_analyse = 0x1000000;
+static int uncompress_yaz0 = 1;
+static int unpack_rarc = 1;
 
 static FILE *disc_fp;
 
@@ -161,7 +161,7 @@ static void spinner(u64 x, u64 max)
 	percent = 100.0 * x / max;
 
 	fprintf(stderr, "%5.2f%% (%c) ETA: %d:%02d:%02d  \r",
-		percent, "/|\\-"[(spin++ / SPINNER_SPEED) % 4], h, m, s);
+		percent, "/|\\-"[(spin++ / 64) % 4], h, m, s);
 	fflush(stderr);
 }
 
@@ -198,80 +198,11 @@ static void do_data(u64 size)
 	fclose(fp);
 }
 
-static void do_yaz0_file(const char *name, u64 offset, u32 compressed_size,
-                         u32 uncompressed_size)
-{
-	u8 hist[0x1000];
-	u32 out;
-	char name_unc[256];
-	u8 *data;
-	u8 *in;
-	u8 bits;
-	u32 nbits;
-	u32 n, d, i;
-	FILE *fp;
-
-	snprintf(name_unc, sizeof name_unc, "%s###yaz###", name);
-	fp = fopen(name_unc, "wb");
-	data = malloc(compressed_size);
-	partition_read(offset, data, compressed_size);
-
-	nbits = 0;
-	in = data + 0x10;
-	for (out = 0; out < uncompressed_size; ) {
-		if (nbits == 0) {
-			bits = *in++;
-			nbits = 8;
-		}
-
-		if ((bits & 0x80) != 0) {
-			hist[out++ % 0x1000] = *in++;
-			if (out % 0x1000 == 0)
-				fwrite(hist, 1, 0x1000, fp);
-		} else {
-			n = *in++;
-			d = *in++;
-			d |= (n << 8) & 0xf00;
-			n >>= 4;
-			if (n == 0)
-				n = 0x10 + *in++;
-			n += 2;
-
-			for (i = 0; i < n; i++) {
-				hist[out % 0x1000] = hist[(out - d - 1) % 0x1000];
-				out++;
-				if (out % 0x1000 == 0)
-					fwrite(hist, 1, 0x1000, fp);
-			}
-		}
-
-		nbits--;
-		bits <<= 1;
-	};
-
-	if (out % 0x1000 != 0)
-		fwrite(hist, 1, out % 0x1000, fp);
-
-	free(data);
-	fclose(fp);
-}
-
 static void copy_file(const char *name, u64 offset, u64 size)
 {
 	u8 data[0x80000];
 	FILE *fp;
 	u32 block_size;
-
-	if (decompress_yaz0 && size >= 8) {
-		partition_read(offset, data, 8);
-		if (memcmp(data, "Yaz0", 4) == 0) {
-			fprintf(stderr, " [Yaz0]");
-
-			do_yaz0_file(name, offset, size, be32(data + 4));
-
-			return;
-		}
-	}
 
 	fp = fopen(name, "wb");
 
@@ -288,6 +219,87 @@ static void copy_file(const char *name, u64 offset, u64 size)
 	}
 
 	fclose(fp);
+}
+
+static void do_yaz0(u8 *in, u32 in_size, u8 *out, u32 out_size)
+{
+	u32 nout;
+	u8 bits;
+	u32 nbits;
+	u32 n, d, i;
+
+	nbits = 0;
+	in += 0x10;
+	for (nout = 0; nout < out_size; ) {
+		if (nbits == 0) {
+			bits = *in++;
+			nbits = 8;
+		}
+
+		if ((bits & 0x80) != 0) {
+			*out++ = *in++;
+			nout++;
+		} else {
+			n = *in++;
+			d = *in++;
+			d |= (n << 8) & 0xf00;
+			n >>= 4;
+			if (n == 0)
+				n = 0x10 + *in++;
+			n += 2;
+			d++;
+
+			for (i = 0; i < n; i++) {
+				*out = *(out - d);
+				out++;
+			}
+			nout += n;
+		}
+
+		nbits--;
+		bits <<= 1;
+	};
+}
+
+static void do_fst_file(const char *name, u64 offset, u64 size)
+{
+	FILE *fp;
+	u8 *data;
+
+	if (size > max_size_to_auto_analyse) {
+		copy_file(name, offset, size);
+
+		return;
+	}
+
+	data = malloc(size);
+	partition_read(offset, data, size);
+
+	if (uncompress_yaz0 && size >= 8 && memcmp(data, "Yaz0", 4) == 0) {
+		u8 *dec;
+		u32 dec_size;
+
+		fprintf(stderr, " [Yaz0]");
+
+		dec_size = be32(data + 4);
+		dec = malloc(dec_size);
+
+		do_yaz0(data, size, dec, dec_size);
+
+		free(data);
+		data = dec;
+		size = dec_size;
+	}
+
+	if (unpack_rarc && size >= 8 && memcmp(data, "RARC", 4) == 0) {
+		fprintf(stderr, " [RARC]");
+	}
+
+	fp = fopen(name, "wb");
+	fwrite(data, 1, size, fp);
+	fclose(fp);
+
+	free(data);
 }
 
 static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
@@ -338,7 +350,7 @@ static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
 		return size;
 	} else {
 		offset = be34(fst + 12*i + 4);
-		copy_file(name, offset, size);
+		do_fst_file(name, offset, size);
 
 		fprintf(stderr, "\n");
 
