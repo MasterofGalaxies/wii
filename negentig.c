@@ -265,6 +265,8 @@ static void copy_file(const char *name, u64 offset, u64 size)
 	if (decompress_yaz0 && size >= 8) {
 		partition_read(offset, data, 8);
 		if (memcmp(data, "Yaz0", 4) == 0) {
+			fprintf(stderr, " [Yaz0]");
+
 			do_yaz0_file(name, offset, size, be32(data + 4));
 
 			return;
@@ -336,11 +338,9 @@ static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
 		return size;
 	} else {
 		offset = be34(fst + 12*i + 4);
-
-		//fprintf(stderr, " @ %09llx, size %08x\n", offset, size);
-		fprintf(stderr, "\n");
-
 		copy_file(name, offset, size);
+
+		fprintf(stderr, "\n");
 
 		return i + 1;
 	}
