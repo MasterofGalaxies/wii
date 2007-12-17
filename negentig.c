@@ -3,8 +3,11 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+static int dump_partition_data = 0;
 
 #define SPINNER_SPEED 64
 
@@ -160,7 +163,7 @@ static void spinner(u64 x, u64 max)
 	fflush(stderr);
 }
 
-static void do_data(const char *dirname, u64 size)
+static void do_data(u64 size)
 {
 	u8 data[0x7c00];
 	u64 offset;
@@ -169,9 +172,6 @@ static void do_data(const char *dirname, u64 size)
 	FILE *fp;
 
 	size = (size / 0x8000) * 0x7c00;
-
-	mkdir(dirname, 0777);
-	chdir(dirname);
 
 	fp = fopen("###dat###", "wb");
 
@@ -194,13 +194,131 @@ static void do_data(const char *dirname, u64 size)
 	spinner(0, 0);
 
 	fclose(fp);
+}
 
-	chdir("..");
+static void copy_file(const char *name, u64 offset, u64 size)
+{
+	u8 data[0x80000];
+	FILE *fp;
+	u32 block_size;
+
+	fp = fopen(name, "wb");
+
+	while (size) {
+		block_size = sizeof data;
+		if (block_size > size)
+			block_size = size;
+
+		partition_read(offset, data, block_size);
+		fwrite(data, 1, block_size, fp);
+
+		offset += block_size;
+		size -= block_size;
+	}
+
+	fclose(fp);
+}
+
+static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
+{
+	u64 offset;
+	u32 size;
+	const char *name;
+	u32 parent;
+	u32 j;
+
+	name = names + (be32(fst + 12*i) & 0x00ffffff);
+	size = be32(fst + 12*i + 8);
+
+	if (i == 0) {
+		fprintf(stderr, "/\n");
+
+		for (j = 1; j < size; )
+			j = do_fst(fst, names, j, indent, (j == size - 1));
+
+		return size;
+	}
+
+	if (fst[12*i]) {
+		parent = be32(fst + 12*i + 4);
+		is_last = (be32(fst + 12*parent + 8) == size);
+	}
+
+	fprintf(stderr, "%s%c-- %s", indent, "|+"[is_last], name);
+
+	if (fst[12*i]) {
+		mkdir(name, 0777);
+		chdir(name);
+
+		fprintf(stderr, "\n");
+
+		if (is_last)
+			strcat(indent, "    ");
+		else
+			strcat(indent, "|   ");
+
+		for (j = i + 1; j < size; )
+			j = do_fst(fst, names, j, indent, (j == size - 1));
+
+		indent[strlen(indent) - 4] = 0;
+
+		chdir("..");
+
+		return size;
+	} else {
+		offset = be34(fst + 12*i + 4);
+
+		fprintf(stderr, " @ %09llx, size %08x\n", offset, size);
+
+		copy_file(name, offset, size);
+
+		return i + 1;
+	}
+}
+
+static void do_files(void)
+{
+	u8 b[0x480]; // XXX: determine actual header size
+	u64 dol_offset;
+	u64 fst_offset;
+	u32 fst_size;
+	u8 *fst;
+	char indent[999];
+	u32 n_files;
+
+	partition_read(0, b, sizeof b);
+
+	fprintf(stderr, "Title id: %c%c%c%c\n", b[0], b[1], b[2], b[3]);
+	fprintf(stderr, "Group id: %c%c\n", b[4], b[5]);
+	fprintf(stderr, "Name: %s\n", b + 0x20);
+	fprintf(stderr, "\n");
+
+	dol_offset = be34(b + 0x0420);
+	fst_offset = be34(b + 0x0424);
+	fst_size = be34(b + 0x0428);
+
+	fprintf(stderr, "\tDOL @ %09llx\n", dol_offset);
+	fprintf(stderr, "\tFST @ %09llx (size %08x)\n", fst_offset, fst_size);
+
+	copy_file("###apl###", 0x2440, dol_offset - 0x2440); // XXX: wrong way to get this size, there is a header
+	copy_file("###dol###", dol_offset, fst_offset - dol_offset); // XXX: similar, perhaps
+
+	fst = malloc(fst_size);
+	partition_read(fst_offset, fst, fst_size);
+	n_files = be32(fst + 8);
+
+	fprintf(stderr, "%d entries\n", n_files);
+
+	indent[0] = 0;
+	if (n_files > 1)
+		do_fst(fst, (char *)fst + 12*n_files, 0, indent, 0);
+
+	free(fst);
 }
 
 static void do_partition(void)
 {
-	u8 b[0x2c0];
+	u8 b[0x02c0];
 	u64 title_id;
 	u32 tmd_offset;
 	u64 tmd_size;
@@ -215,7 +333,7 @@ static void do_partition(void)
 
 	title_id = be64(b + 0x01dc);
 
-	fprintf(stderr, "title id = %016llx\n", title_id);
+	fprintf(stderr, "\ttitle id = %016llx\n", title_id);
 
 	// XXX: we should check the cert chain here, and read the tmd
 
@@ -227,19 +345,28 @@ static void do_partition(void)
 	partition_data_offset = be34(b + 0x02b8);
 	partition_data_size = be34(b + 0x02bc);
 
-	fprintf(stderr, "tmd offset  =  %08x\n", tmd_offset);
-	fprintf(stderr, "tmd size    = %09llx\n", tmd_size);
-	fprintf(stderr, "cert size   =  %08x\n", cert_size);
-	fprintf(stderr, "cert offset = %09llx\n", cert_offset);
-	fprintf(stderr, "data offset = %09llx\n", partition_data_offset);
-	fprintf(stderr, "data size   = %09llx\n", partition_data_size);
+	fprintf(stderr, "\ttmd offset  =  %08x\n", tmd_offset);
+	fprintf(stderr, "\ttmd size    = %09llx\n", tmd_size);
+	fprintf(stderr, "\tcert size   =  %08x\n", cert_size);
+	fprintf(stderr, "\tcert offset = %09llx\n", cert_offset);
+	fprintf(stderr, "\tdata offset = %09llx\n", partition_data_offset);
+	fprintf(stderr, "\tdata size   = %09llx\n", partition_data_size);
 
 	partition_raw_read(h3_offset, h3, 0x18000);
 
 	// XXX: check h3 against h4 here
 
 	snprintf(dirname, sizeof dirname, "%016llx", title_id);
-	do_data(dirname, partition_data_size);
+
+	mkdir(dirname, 0777);
+	chdir(dirname);
+
+	if (dump_partition_data)
+		do_data(partition_data_size);
+
+	do_files();
+
+	chdir("..");
 }
 
 static void do_disc(void)
@@ -269,7 +396,9 @@ static void do_disc(void)
 		        partition_offset[i]);
 
 	for (i = 0; i < n_partitions; i++) {
-		fprintf(stderr, "\n\nDoing partition %d...\n", i);
+		fprintf(stderr, "\nDoing partition %d...\n", i);
+		fprintf(stderr, "--------------------------------\n");
+
 		partition_raw_offset = partition_offset[i];
 		do_partition();
 
