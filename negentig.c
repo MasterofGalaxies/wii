@@ -1,3 +1,6 @@
+// Copyright 2007  Segher Boessenkool  <segher@kernel.crashing.org>
+// Licensed under the terms of the GNU GPL, version 2
+
 #include <openssl/aes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
