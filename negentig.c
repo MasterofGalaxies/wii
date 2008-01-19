@@ -16,7 +16,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
-static int just_a_partition = 1;
+static int just_a_partition = 0;
 static int dump_partition_data = 0;
 static u32 max_size_to_auto_analyse = 0x1000000;
 static int uncompress_yaz0 = 1;
