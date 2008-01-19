@@ -16,6 +16,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
+static int just_a_partition = 1;
 static int dump_partition_data = 0;
 static u32 max_size_to_auto_analyse = 0x1000000;
 static int uncompress_yaz0 = 1;
@@ -114,7 +115,9 @@ static void partition_read(u64 offset, u8 *data, u32 len)
 	u32 offset_in_block;
 	u32 len_in_block;
 
-	while(len) {
+	if (just_a_partition)
+		disc_read(offset, data, len);
+	else while(len) {
 		offset_in_block = offset % 0x7c00;
 		len_in_block = 0x7c00 - offset_in_block;
 		if (len_in_block > len)
@@ -500,7 +503,10 @@ int main(int argc, char **argv)
 
 	disc_fp = fopen(argv[1], "rb");
 
-	do_disc();
+	if (just_a_partition)
+		do_files();
+	else
+		do_disc();
 
 	fclose(disc_fp);
 
