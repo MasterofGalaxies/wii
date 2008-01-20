@@ -31,6 +31,13 @@ static u8 h3[0x18000];
 
 static u8 disc_key[16];
 
+static void fatal(const char *s)
+{
+	perror(s);
+
+	exit(1);
+}
+
 static void print_bytes(u8 *x, u32 n)
 {
 	u32 i;
@@ -54,7 +61,10 @@ static void decrypt_title_key(u8 *title_key, u8 *title_id)
 	FILE *fp;
 
 	fp = fopen("common-key", "rb");
-	fread(common_key, 1, 16, fp);
+	if (fp == 0)
+		fatal("cannot open common-key");
+	if (fread(common_key, 16, 1, fp) != 1)
+		fatal("error reading common-key");
 	fclose(fp);
 
 	memset(iv, 0, sizeof iv);
@@ -80,13 +90,15 @@ static u64 be34(u8 *p)
 
 static void seek(u64 offset)
 {
-	fseeko(disc_fp, offset, SEEK_SET);
+	if (fseeko(disc_fp, offset, SEEK_SET))
+		fatal("error seeking in disc file");
 }
 
 static void disc_read(u64 offset, u8 *data, u32 len)
 {
 	seek(offset);
-	fread(data, 1, len, disc_fp);
+	if (fread(data, len, 1, disc_fp) != 1)
+		fatal("error reading disc");
 }
 
 static void partition_raw_read(u64 offset, u8 *data, u32 len)
@@ -180,6 +192,8 @@ static void do_data(u64 size)
 	size = (size / 0x8000) * 0x7c00;
 
 	fp = fopen("###dat###", "wb");
+	if (fp == 0)
+		fatal("cannot open partition output file");
 
 	fprintf(stderr, "\nDumping partition contents...\n");
 	offset = 0;
@@ -192,7 +206,8 @@ static void do_data(u64 size)
 			block_size = remaining_size;
 
 		partition_read(offset, data, block_size);
-		fwrite(data, 1, block_size, fp);
+		if (fwrite(data, block_size, 1, fp) != 1)
+			fatal("error writing partition");
 
 		offset += block_size;
 		remaining_size -= block_size;
@@ -209,6 +224,8 @@ static void copy_file(const char *name, u64 offset, u64 size)
 	u32 block_size;
 
 	fp = fopen(name, "wb");
+	if (fp == 0)
+		fatal("cannot open output file");
 
 	while (size) {
 		block_size = sizeof data;
@@ -216,7 +233,8 @@ static void copy_file(const char *name, u64 offset, u64 size)
 			block_size = size;
 
 		partition_read(offset, data, block_size);
-		fwrite(data, 1, block_size, fp);
+		if (fwrite(data, block_size, 1, fp) != 1)
+			fatal("error writing output file");
 
 		offset += block_size;
 		size -= block_size;
@@ -277,6 +295,8 @@ static void do_fst_file(const char *name, u64 offset, u64 size)
 	}
 
 	data = malloc(size);
+	if (data == 0)
+		fatal("malloc");
 	partition_read(offset, data, size);
 
 	if (uncompress_yaz0 && size >= 8 && memcmp(data, "Yaz0", 4) == 0) {
@@ -287,6 +307,8 @@ static void do_fst_file(const char *name, u64 offset, u64 size)
 
 		dec_size = be32(data + 4);
 		dec = malloc(dec_size);
+		if (dec == 0)
+			fatal("malloc");
 
 		do_yaz0(data, size, dec, dec_size);
 
@@ -300,7 +322,10 @@ static void do_fst_file(const char *name, u64 offset, u64 size)
 	}
 
 	fp = fopen(name, "wb");
-	fwrite(data, 1, size, fp);
+	if (fp == 0)
+		fatal("cannot open output file");
+	if (fwrite(data, size, 1, fp) != 1)
+		fatal("error writing output file");
 	fclose(fp);
 
 	free(data);
@@ -334,8 +359,10 @@ static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
 	fprintf(stderr, "%s%c-- %s", indent, "|+"[is_last], name);
 
 	if (fst[12*i]) {
-		mkdir(name, 0777);
-		chdir(name);
+		if (mkdir(name, 0777))
+			fatal("mkdir");
+		if (chdir(name))
+			fatal("chdir");
 
 		fprintf(stderr, "\n");
 
@@ -349,7 +376,8 @@ static u32 do_fst(u8 *fst, const char *names, u32 i, char *indent, int is_last)
 
 		indent[strlen(indent) - 4] = 0;
 
-		chdir("..");
+		if (chdir(".."))
+			fatal("chdir up");
 
 		return size;
 	} else {
@@ -392,6 +420,8 @@ static void do_files(void)
 		// XXX: similar, perhaps
 
 	fst = malloc(fst_size);
+	if (fst == 0)
+		fatal("malloc fst");
 	partition_read(fst_offset, fst, fst_size);
 	n_files = be32(fst + 8);
 
@@ -446,15 +476,18 @@ static void do_partition(void)
 
 	snprintf(dirname, sizeof dirname, "%016llx", title_id);
 
-	mkdir(dirname, 0777);
-	chdir(dirname);
+	if (mkdir(dirname, 0777))
+		fatal("mkdir partition");
+	if (chdir(dirname))
+		fatal("chdir partition");
 
 	if (dump_partition_data)
 		do_data(partition_data_size);
 
 	do_files();
 
-	chdir("..");
+	if (chdir(".."))
+		fatal("chdir up out of partition");
 }
 
 static void do_disc(void)
@@ -502,6 +535,8 @@ int main(int argc, char **argv)
 	}
 
 	disc_fp = fopen(argv[1], "rb");
+	if (disc_fp == 0)
+		fatal("open disc file");
 
 	if (just_a_partition)
 		do_files();
