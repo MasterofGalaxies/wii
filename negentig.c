@@ -3,6 +3,7 @@
 // http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
 
 #include <openssl/aes.h>
+#include <openssl/sha.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -30,6 +31,8 @@ static u64 partition_data_size;
 static u8 h3[0x18000];
 
 static u8 disc_key[16];
+
+static u32 errors = 0;
 
 static void fatal(const char *s)
 {
@@ -110,15 +113,60 @@ static void partition_read_block(u64 blockno, u8 *block)
 {
 	u8 raw[0x8000];
 	u8 iv[16];
+	u8 h[20];
+	u8 *h0, *h1, *h2;
+	u32 b1, b2, b3;
 	u64 offset;
+	u32 i;
 
 	offset = partition_data_offset + 0x8000 * blockno;
 	partition_raw_read(offset, raw, 0x8000);
 
-	// XXX: check H0, H1, H2 here
-
+	// decrypt data
 	memcpy(iv, raw + 0x3d0, 16);
 	aes_cbc_dec(disc_key, iv, raw + 0x400, 0x7c00, block);
+
+	// decrypt hashes
+	memset(iv, 0, 16);
+	aes_cbc_dec(disc_key, iv, raw, 0x400, raw);
+
+	h0 = raw;
+	h1 = raw + 0x280;
+	h2 = raw + 0x340;
+	b1 = blockno & 7;
+	b2 = (blockno >> 3) & 7;
+	b3 = blockno >> 6;
+
+	// check H0s
+	for (i = 0; i < 31; i++) {
+		SHA1(block + 0x400*i, 0x400, h);
+		if (memcmp(h0 + 20*i, h, 20)) {
+			fprintf(stderr, "H0 mismatch for %llx.%02x\n",
+			        blockno, i);
+			errors |= 1;
+		}
+	}
+
+	// check H1
+	SHA1(h0, 620, h);
+	if (memcmp(h1 + 20*b1, h, 20)) {
+		fprintf(stderr, "H1 mismatch for %llx\n", blockno);
+		errors |= 2;
+	}
+
+	// check H2
+	SHA1(h1, 160, h);
+	if (memcmp(h2 + 20*b2, h, 20)) {
+		fprintf(stderr, "H2 mismatch for %llx\n", blockno);
+		errors |= 4;
+	}
+
+	// check H3
+	SHA1(h2, 160, h);
+	if (memcmp(h3 + 20*b3, h, 20)) {
+		fprintf(stderr, "H3 mismatch for %llx\n", blockno);
+		errors |= 8;
+	}
 }
 
 static void partition_read(u64 offset, u8 *data, u32 len)
@@ -544,6 +592,17 @@ int main(int argc, char **argv)
 		do_disc();
 
 	fclose(disc_fp);
+
+	if (errors)
+		fprintf(stderr, "\n\nErrors detected:\n");
+	if (errors & 1)
+		fprintf(stderr, "H0 mismatch\n");
+	if (errors & 2)
+		fprintf(stderr, "H1 mismatch\n");
+	if (errors & 4)
+		fprintf(stderr, "H2 mismatch\n");
+	if (errors & 8)
+		fprintf(stderr, "H3 mismatch\n");
 
 	return 0;
 }
