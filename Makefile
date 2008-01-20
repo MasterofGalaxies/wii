@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -W -O2
+CFLAGS = -DLARGE_FILES -D_FILE_OFFSET_BITS=64 -Wall -W -O2
 LDFLAGS = -lcrypto
 
 all: negentig
