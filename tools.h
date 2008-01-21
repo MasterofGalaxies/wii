@@ -10,10 +10,10 @@ u32 be32(u8 *p);
 u64 be64(u8 *p);
 u64 be34(u8 *p);
 
-u8 disc_key[16];
-
 void aes_cbc_dec(u8 *key, u8 *iv, u8 *in, u32 len, u8 *out);
-void decrypt_title_key(u8 *title_key, u8 *title_id);
+
+void get_key(const char *name, u8 *key, u32 len);
+void decrypt_title_key(u8 *title_key_crypted, u8 *title_id, u8 *title_key);
 
 void fatal(const char *s);
 

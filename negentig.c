@@ -26,6 +26,8 @@ static u64 partition_data_offset;
 static u64 partition_data_size;
 static u8 h3[0x18000];
 
+u8 disc_key[16];
+
 static u32 errors = 0;
 
 static void seek(u64 offset)
@@ -432,7 +434,7 @@ static void do_partition(void)
 
 	partition_raw_read(0, b, 0x02c0);
 
-	decrypt_title_key(b + 0x01bf, b + 0x01dc);
+	decrypt_title_key(b + 0x01bf, b + 0x01dc, disc_key);
 
 	title_id = be64(b + 0x01dc);
 

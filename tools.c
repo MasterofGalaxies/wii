@@ -28,10 +28,8 @@ void aes_cbc_dec(u8 *key, u8 *iv, u8 *in, u32 len, u8 *out)
 	AES_cbc_encrypt(in, out, len, &aes_key, iv, AES_DECRYPT);
 }
 
-void decrypt_title_key(u8 *title_key, u8 *title_id)
+void get_key(const char *name, u8 *key, u32 len)
 {
-	u8 common_key[16];
-	u8 iv[16];
 	char path[256];
 	char *home;
 	FILE *fp;
@@ -39,19 +37,26 @@ void decrypt_title_key(u8 *title_key, u8 *title_id)
 	home = getenv("HOME");
 	if (home == 0)
 		fatal("cannot find HOME");
-	snprintf(path, sizeof path, "%s/.wii/common-key", home);
+	snprintf(path, sizeof path, "%s/.wii/%s", home, name);
 
 	fp = fopen(path, "rb");
 	if (fp == 0)
 		fatal("cannot open common-key");
-	if (fread(common_key, 16, 1, fp) != 1)
+	if (fread(key, len, 1, fp) != 1)
 		fatal("error reading common-key");
 	fclose(fp);
+}
+
+void decrypt_title_key(u8 *title_key_crypted, u8 *title_id, u8 *title_key)
+{
+	u8 common_key[16];
+	u8 iv[16];
+
+	get_key("common-key", common_key, 16);
 
 	memset(iv, 0, sizeof iv);
 	memcpy(iv, title_id, 8);
-
-	aes_cbc_dec(common_key, iv, title_key, 16, disc_key);
+	aes_cbc_dec(common_key, iv, title_key_crypted, 16, title_key);
 }
 
 u32 be32(u8 *p)
