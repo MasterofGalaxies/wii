@@ -383,6 +383,9 @@ static void do_files(void)
 	u64 dol_offset;
 	u64 fst_offset;
 	u32 fst_size;
+	u64 apl_offset;
+	u32 apl_size;
+	u8 apl_header[0x20];
 	u8 *fst;
 	char indent[999];
 	u32 n_files;
@@ -398,13 +401,17 @@ static void do_files(void)
 	fst_offset = be34(b + 0x0424);
 	fst_size = be34(b + 0x0428);
 
+	apl_offset = 0x2440;
+	partition_read(apl_offset, apl_header, sizeof apl_header);
+	apl_size = 0x20 + be32(apl_header + 0x14) + be32(apl_header + 0x18);
+
 	fprintf(stderr, "\tDOL @ %09llx\n", dol_offset);
 	fprintf(stderr, "\tFST @ %09llx (size %08x)\n", fst_offset, fst_size);
+	fprintf(stderr, "\tAPL @ %09llx (size %08x)\n", apl_offset, apl_size);
 
-	copy_file("###apl###", 0x2440, dol_offset - 0x2440);
-		// XXX: wrong way to get this size, there is a header
+	copy_file("###apl###", apl_offset, apl_size);
 	copy_file("###dol###", dol_offset, fst_offset - dol_offset);
-		// XXX: similar, perhaps
+		// XXX: read the header for getting the size
 
 	fst = malloc(fst_size);
 	if (fst == 0)
