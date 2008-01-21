@@ -77,6 +77,11 @@ void decrypt_title_key(u8 *title_key_crypted, u8 *title_id, u8 *title_key)
 	aes_cbc_dec(common_key, iv, title_key_crypted, 16, title_key);
 }
 
+int check_cert(u8 *data, u32 data_len, u8 *cert, u32 cert_len)
+{
+	return -1;
+}
+
 //
 // compression
 //
@@ -142,4 +147,21 @@ void print_bytes(u8 *x, u32 n)
 
 	for (i = 0; i < n; i++)
 		fprintf(stderr, "%02x", x[i]);
+}
+
+void hexdump(u8 *x, u32 n)
+{
+	u32 i, j;
+
+	for (i = 0; i < n; i += 16) {
+		fprintf(stderr, "%04x:", i);
+		for (j = 0; j < 16 && i + j < n; j++) {
+			if ((j & 3) == 0)
+				fprintf(stderr, " ");
+			fprintf(stderr, "%02x", *x++);
+		}
+		fprintf(stderr, "\n");
+	}
+	if (n & 15)
+		fprintf(stderr, "\n");
 }

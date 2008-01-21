@@ -351,6 +351,7 @@ static void do_files(void)
 
 	partition_read(0, b, sizeof b);
 
+	fprintf(stderr, "\n");
 	fprintf(stderr, "Title id: %c%c%c%c\n", b[0], b[1], b[2], b[3]);
 	fprintf(stderr, "Group id: %c%c\n", b[4], b[5]);
 	fprintf(stderr, "Name: %s\n", b + 0x20);
@@ -389,43 +390,74 @@ static void do_files(void)
 
 static void do_partition(void)
 {
-	u8 b[0x02c0];
+	u8 tik[0x2a4];
+	u8 b[0x1c];
 	u64 title_id;
-	u32 tmd_offset;
-	u64 tmd_size;
-	u32 cert_size;
+	u64 tmd_offset;
+	u32 tmd_size;
+	u8 *tmd;
 	u64 cert_offset;
+	u32 cert_size;
+	u8 *cert;
 	u64 h3_offset;
-	char dirname[] = "title-0000000000000000";
+	u8 h[20];
+	char dirname[17];
 
-	partition_raw_read(0, b, 0x02c0);
+	// read ticket, and read some offsets and sizes
+	partition_raw_read(0, tik, sizeof tik);
+	partition_raw_read(0x2a4, b, sizeof b);
 
-	decrypt_title_key(b + 0x01bf, b + 0x01dc, disc_key);
+	tmd_size = be32(b);
+	tmd_offset = be34(b + 4);
+	cert_size = be32(b + 8);
+	cert_offset = be34(b + 0x0c);
+	h3_offset = be34(b + 0x10);
+	partition_data_offset = be34(b + 0x14);
+	partition_data_size = be34(b + 0x18);
 
-	title_id = be64(b + 0x01dc);
-
+	title_id = be64(tik + 0x01dc);
 	fprintf(stderr, "\ttitle id = %016llx\n", title_id);
 
-	// XXX: we should check the cert chain here, and read the tmd
-
-	tmd_offset = be32(b + 0x02a4);
-	tmd_size = be34(b + 0x02a8);
-	cert_size = be32(b + 0x02ac);
-	cert_offset = be34(b + 0x02b0);
-	h3_offset = be34(b + 0x02b4);
-	partition_data_offset = be34(b + 0x02b8);
-	partition_data_size = be34(b + 0x02bc);
-
-	fprintf(stderr, "\ttmd offset  =  %08x\n", tmd_offset);
-	fprintf(stderr, "\ttmd size    = %09llx\n", tmd_size);
+	fprintf(stderr, "\ttmd size    =  %08x\n", tmd_size);
+	fprintf(stderr, "\ttmd offset  = %09llx\n", tmd_offset);
 	fprintf(stderr, "\tcert size   =  %08x\n", cert_size);
 	fprintf(stderr, "\tcert offset = %09llx\n", cert_offset);
 	fprintf(stderr, "\tdata offset = %09llx\n", partition_data_offset);
 	fprintf(stderr, "\tdata size   = %09llx\n", partition_data_size);
 
+	tmd = malloc(tmd_size);
+	if (tmd == 0)
+		fatal("malloc tmd");
+	partition_raw_read(tmd_offset, tmd, tmd_size);
+
+	cert = malloc(cert_size);
+	if (cert == 0)
+		fatal("malloc cert");
+	partition_raw_read(cert_offset, cert, cert_size);
+
+	if (check_cert(tik, sizeof tik, cert, cert_size)) {
+		fprintf(stderr, "ticket cert failure\n");
+		errors |= 0x20;
+	}
+	if (check_cert(tmd, tmd_size, cert, cert_size)) {
+		fprintf(stderr, "tmd cert failure\n");
+		errors |= 0x40;
+	}
+
+	// XXX: we should check the cert chain here
+
+	decrypt_title_key(tik + 0x01bf, tik + 0x01dc, disc_key);
+
 	partition_raw_read(h3_offset, h3, 0x18000);
 
-	// XXX: check h3 against h4 here
+	sha(h3, 0x18000, h);
+	if (memcmp(tmd + 0x1f4, h, 20)) {
+		fprintf(stderr, "H4 mismatch\n");
+		errors |= 0x10;
+	}
+
+	free(cert);
+	free(tmd);
 
 	snprintf(dirname, sizeof dirname, "%016llx", title_id);
 
@@ -508,6 +540,12 @@ int main(int argc, char **argv)
 		fprintf(stderr, "H2 mismatch\n");
 	if (errors & 8)
 		fprintf(stderr, "H3 mismatch\n");
+	if (errors & 0x10)
+		fprintf(stderr, "H4 mismatch\n");
+	if (errors & 0x20)
+		fprintf(stderr, "ticket cert failure\n");
+	if (errors & 0x40)
+		fprintf(stderr, "tmd cert failure\n");
 
 	return 0;
 }
