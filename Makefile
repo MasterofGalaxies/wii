@@ -9,4 +9,4 @@ negentig: negentig.o tools.o bn.o
 *.o:	*.c *.h Makefile
 
 clean:
-	-rm -f negentig negentig.o tools.o
+	-rm -f negentig negentig.o tools.o bn.o
