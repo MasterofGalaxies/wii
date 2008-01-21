@@ -401,6 +401,7 @@ static void do_partition(void)
 	u8 *cert;
 	u64 h3_offset;
 	u8 h[20];
+	u32 ret;
 	char dirname[17];
 
 	// read ticket, and read some offsets and sizes
@@ -435,12 +436,14 @@ static void do_partition(void)
 		fatal("malloc cert");
 	partition_raw_read(cert_offset, cert, cert_size);
 
-	if (check_cert(tik, sizeof tik, cert, cert_size)) {
-		fprintf(stderr, "ticket cert failure\n");
+	ret = check_cert_chain(tik, sizeof tik, cert, cert_size);
+	if (ret) {
+		fprintf(stderr, "ticket cert failure (%d)\n", ret);
 		errors |= 0x20;
 	}
-	if (check_cert(tmd, tmd_size, cert, cert_size)) {
-		fprintf(stderr, "tmd cert failure\n");
+	ret = check_cert_chain(tmd, tmd_size, cert, cert_size);
+	if (ret) {
+		fprintf(stderr, "tmd cert failure (%d)\n", ret);
 		errors |= 0x40;
 	}
 

@@ -77,9 +77,179 @@ void decrypt_title_key(u8 *title_key_crypted, u8 *title_id, u8 *title_key)
 	aes_cbc_dec(common_key, iv, title_key_crypted, 16, title_key);
 }
 
-int check_cert(u8 *data, u32 data_len, u8 *cert, u32 cert_len)
+static u8 root_key[0x204];
+static u8 *get_root_key(void)
 {
-	return -1;
+	get_key("root-key", root_key, sizeof root_key);
+	return root_key;
+}
+
+static u32 get_sig_len(u8 *sig)
+{
+	u32 type;
+
+	type = be32(sig);
+	switch (type - 0x10000) {
+	case 0:
+		return 0x240;
+
+	case 1:
+		return 0x140;
+
+	case 2:
+		return 0x80;
+	}
+
+	fprintf(stderr, "get_sig_len(): unhandled sig type %08x\n", type);
+	return 0;
+}
+
+static u32 get_sub_len(u8 *sub)
+{
+	u32 type;
+
+	type = be32(sub + 0x40);
+	switch (type) {
+	case 0:
+		return 0x2c0;
+
+	case 1:
+		return 0x1c0;
+
+	case 2:
+		return 0x100;
+	}
+
+	fprintf(stderr, "get_sub_len(): unhandled sub type %08x\n", type);
+	return 0;
+}
+
+static int check_rsa(u8 *h, u8 *sig, u8 *key, u32 n)
+{
+	u8 correct[0x200];
+	u8 x[0x200];
+	static const u8 ber[16] = "\x00\x30\x21\x30\x09\x06\x05\x2b"
+	                          "\x0e\x03\x02\x1a\x05\x00\x04\x14";
+
+	correct[0] = 0;
+	correct[1] = 1;
+	memset(correct + 2, 0xff, n - 38);
+	memcpy(correct + n - 36, ber, 16);
+	memcpy(correct + n - 20, h, 20);
+//fprintf(stderr, "correct is:\n");
+//hexdump(correct, n);
+
+	bn_exp(x, sig, key, n, key + n, 4);
+//fprintf(stderr, "x is:\n");
+//hexdump(x, n);
+
+	if (memcmp(correct, x, n) == 0)
+		return 0;
+
+	return -5;
+}
+
+static int check_hash(u8 *h, u8 *sig, u8 *key)
+{
+	u32 type;
+
+	type = be32(sig) - 0x10000;
+	if (type != be32(key + 0x40))
+		return -6;
+
+	switch (type) {
+	case 1:
+		return check_rsa(h, sig + 4, key + 0x88, 0x100);
+	}
+
+	return -7;
+}
+
+static u8 *find_cert_in_chain(u8 *sub, u8 *cert, u32 cert_len)
+{
+	char parent[64];
+	char *child;
+	u32 sig_len, sub_len;
+	u8 *p;
+	u8 *issuer;
+
+	strncpy(parent, sub, sizeof parent);
+	parent[sizeof parent - 1] = 0;
+	child = strrchr(parent, '-');
+	if (child)
+		*child++ = 0;
+	else {
+		*parent = 0;
+		child = sub;
+	}
+
+	for (p = cert; p < cert + cert_len; p += sig_len + sub_len) {
+		sig_len = get_sig_len(p);
+		if (sig_len == 0)
+			return 0;
+		issuer = p + sig_len;
+		sub_len = get_sub_len(issuer);
+		if (sub_len == 0)
+			return 0;
+
+		if (strcmp(parent, issuer) == 0
+		    && strcmp(child, issuer + 0x44) == 0)
+			return p;
+	}
+
+	return 0;
+}
+
+int check_cert_chain(u8 *data, u32 data_len, u8 *cert, u32 cert_len)
+{
+	u8 *sig;
+	u8 *sub;
+	u32 sig_len;
+	u32 sub_len;
+	u8 h[20];
+	u8 *key_cert;
+	u8 *key;
+	int ret;
+
+	sig = data;
+	sig_len = get_sig_len(sig);
+	if (sig_len == 0)
+		return -1;
+	sub = data + sig_len;
+	sub_len = data_len - sig_len;
+	if (sub_len == 0)
+		return -2;
+
+	for (;;) {
+fprintf(stderr, ">>>>>> checking sig by %s...\n", sub);
+		if (strcmp(sub, "Root") == 0) {
+			key = get_root_key();
+			sha(sub, sub_len, h);
+			if (be32(sig) != 0x10000)
+				return -8;
+			return check_rsa(h, sig + 4, key, 0x200);
+		}
+
+		key_cert = find_cert_in_chain(sub, cert, cert_len);
+		if (key_cert == 0)
+			return -3;
+
+		key = key_cert + get_sig_len(key_cert);
+
+		sha(sub, sub_len, h);
+		ret = check_hash(h, sig, key);
+		if (ret)
+			return ret;
+
+		sig = key_cert;
+		sig_len = get_sig_len(sig);
+		if (sig_len == 0)
+			return -4;
+		sub = sig + sig_len;
+		sub_len = get_sub_len(sub);
+		if (sub_len == 0)
+			return -5;
+	}
 }
 
 //

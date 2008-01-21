@@ -4,9 +4,9 @@ LDFLAGS = -lcrypto
 
 all: negentig
 
-negentig: negentig.o tools.o
+negentig: negentig.o tools.o bn.o
 
-*.o:	*.c *.h
+*.o:	*.c *.h Makefile
 
 clean:
 	-rm -f negentig negentig.o tools.o
