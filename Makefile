@@ -4,7 +4,7 @@ LDFLAGS = -lcrypto
 
 all: negentig
 
-negentig: negentig.o
+negentig: negentig.o tools.o
 
 clean:
-	-rm -f negentig negentig.o
+	-rm -f negentig negentig.o tools.o
