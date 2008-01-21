@@ -2,7 +2,6 @@
 // Licensed under the terms of the GNU GPL, version 2
 // http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
 
-#include <openssl/sha.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -78,7 +77,7 @@ static void partition_read_block(u64 blockno, u8 *block)
 
 	// check H0s
 	for (i = 0; i < 31; i++) {
-		SHA1(block + 0x400*i, 0x400, h);
+		sha(block + 0x400*i, 0x400, h);
 		if (memcmp(h0 + 20*i, h, 20)) {
 			fprintf(stderr, "H0 mismatch for %llx.%02x\n",
 			        blockno, i);
@@ -87,21 +86,21 @@ static void partition_read_block(u64 blockno, u8 *block)
 	}
 
 	// check H1
-	SHA1(h0, 620, h);
+	sha(h0, 620, h);
 	if (memcmp(h1 + 20*b1, h, 20)) {
 		fprintf(stderr, "H1 mismatch for %llx\n", blockno);
 		errors |= 2;
 	}
 
 	// check H2
-	SHA1(h1, 160, h);
+	sha(h1, 160, h);
 	if (memcmp(h2 + 20*b2, h, 20)) {
 		fprintf(stderr, "H2 mismatch for %llx\n", blockno);
 		errors |= 4;
 	}
 
 	// check H3
-	SHA1(h2, 160, h);
+	sha(h2, 160, h);
 	if (memcmp(h3 + 20*b3, h, 20)) {
 		fprintf(stderr, "H3 mismatch for %llx\n", blockno);
 		errors |= 8;

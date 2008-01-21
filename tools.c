@@ -1,6 +1,11 @@
+// Copyright 2007,2008  Segher Boessenkool  <segher@kernel.crashing.org>
+// Licensed under the terms of the GNU GPL, version 2
+// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
 #include "tools.h"
 
 #include <openssl/aes.h>
+#include <openssl/sha.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -27,6 +32,11 @@ u64 be34(u8 *p)
 //
 // crypto
 //
+
+void sha(u8 *data, u32 len, u8 *hash)
+{
+	SHA1(data, len, hash);
+}
 
 void get_key(const char *name, u8 *key, u32 len)
 {
