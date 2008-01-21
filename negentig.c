@@ -230,46 +230,6 @@ static void copy_file(const char *name, u64 offset, u64 size)
 	fclose(fp);
 }
 
-static void do_yaz0(u8 *in, u32 in_size, u8 *out, u32 out_size)
-{
-	u32 nout;
-	u8 bits;
-	u32 nbits;
-	u32 n, d, i;
-
-	nbits = 0;
-	in += 0x10;
-	for (nout = 0; nout < out_size; ) {
-		if (nbits == 0) {
-			bits = *in++;
-			nbits = 8;
-		}
-
-		if ((bits & 0x80) != 0) {
-			*out++ = *in++;
-			nout++;
-		} else {
-			n = *in++;
-			d = *in++;
-			d |= (n << 8) & 0xf00;
-			n >>= 4;
-			if (n == 0)
-				n = 0x10 + *in++;
-			n += 2;
-			d++;
-
-			for (i = 0; i < n; i++) {
-				*out = *(out - d);
-				out++;
-			}
-			nout += n;
-		}
-
-		nbits--;
-		bits <<= 1;
-	};
-}
-
 static void do_fst_file(const char *name, u64 offset, u64 size)
 {
 	FILE *fp;
