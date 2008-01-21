@@ -32,9 +32,16 @@ void decrypt_title_key(u8 *title_key, u8 *title_id)
 {
 	u8 common_key[16];
 	u8 iv[16];
+	char path[256];
+	char *home;
 	FILE *fp;
 
-	fp = fopen("common-key", "rb");
+	home = getenv("HOME");
+	if (home == 0)
+		fatal("cannot find HOME");
+	snprintf(path, sizeof path, "%s/.wii/common-key", home);
+
+	fp = fopen(path, "rb");
 	if (fp == 0)
 		fatal("cannot open common-key");
 	if (fread(common_key, 16, 1, fp) != 1)
