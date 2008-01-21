@@ -6,5 +6,7 @@ all: negentig
 
 negentig: negentig.o tools.o
 
+*.o:	*.c *.h
+
 clean:
 	-rm -f negentig negentig.o tools.o
