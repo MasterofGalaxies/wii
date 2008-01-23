@@ -29,7 +29,7 @@ static void bn_copy(u8 *d, u8 *a, u32 n)
 	memcpy(d, a, n);
 }
 
-static int bn_compare(u8 *a, u8 *b, u32 n)
+int bn_compare(u8 *a, u8 *b, u32 n)
 {
 	u32 i;
 
@@ -43,7 +43,7 @@ static int bn_compare(u8 *a, u8 *b, u32 n)
 	return 0;
 }
 
-static void bn_sub_raw(u8 *a, u8 *N, u32 n)
+void bn_sub_modulus(u8 *a, u8 *N, u32 n)
 {
 	u32 i;
 	u32 dig;
@@ -57,7 +57,7 @@ static void bn_sub_raw(u8 *a, u8 *N, u32 n)
 	}
 }
 
-static void bn_add(u8 *d, u8 *a, u8 *b, u8 *N, u32 n)
+void bn_add(u8 *d, u8 *a, u8 *b, u8 *N, u32 n)
 {
 	u32 i;
 	u32 dig;
@@ -71,13 +71,13 @@ static void bn_add(u8 *d, u8 *a, u8 *b, u8 *N, u32 n)
 	}
 
 	if (c)
-		bn_sub_raw(d, N, n);
+		bn_sub_modulus(d, N, n);
 
 	if (bn_compare(d, N, n) >= 0)
-		bn_sub_raw(d, N, n);
+		bn_sub_modulus(d, N, n);
 }
 
-static void bn_mul(u8 *d, u8 *a, u8 *b, u8 *N, u32 n)
+void bn_mul(u8 *d, u8 *a, u8 *b, u8 *N, u32 n)
 {
 	u32 i;
 	u8 mask;
@@ -111,13 +111,13 @@ void bn_exp(u8 *d, u8 *a, u8 *N, u32 n, u8 *e, u32 en)
 }
 
 // only for prime N -- stupid but lazy, see if I care
-static void bn_inv(u8 *d, u8 *a, u8 *N, u32 n)
+void bn_inv(u8 *d, u8 *a, u8 *N, u32 n)
 {
 	u8 t[512], s[512];
 
 	bn_copy(t, N, n);
 	bn_zero(s, n);
 	s[n-1] = 2;
-	bn_sub_raw(t, s, n);
+	bn_sub_modulus(t, s, n);
 	bn_exp(d, a, N, n, t, n);
 }
