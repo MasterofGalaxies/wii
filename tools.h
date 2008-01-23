@@ -11,6 +11,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
+u16 be16(u8 *p);
 u32 be32(u8 *p);
 u64 be64(u8 *p);
 u64 be34(u8 *p);

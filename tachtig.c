@@ -19,6 +19,46 @@ static u32 n_files;
 static u32 files_size;
 static u32 total_size;
 
+static void output_image(u8 *data, u32 w, u32 h, const char *name)
+{
+	FILE *fp;
+	u32 x, y;
+
+	fp = fopen(name, "wb");
+
+	fprintf(fp, "P6 %d %d 255\n", w, h);
+
+	for (y = 0; y < h; y++)
+		for (x = 0; x < w; x++) {
+			u8 pix[3];
+			u16 raw;
+			u32 x0, x1, y0, y1, off;
+
+			x0 = x & 3;
+			x1 = x >> 2;
+			y0 = y & 3;
+			y1 = y >> 2;
+			off = x0 + 4 * y0 + 16 * x1 + 4 * w * y1;
+
+			raw = be16(data + 2*off);
+
+			// RGB5A3
+			if (raw & 0x8000) {
+				pix[0] = (raw >> 7) & 0xf8;
+				pix[1] = (raw >> 2) & 0xf8;
+				pix[2] = (raw << 3) & 0xf8;
+			} else {
+				pix[0] = (raw >> 4) & 0xf0;
+				pix[1] =  raw       & 0xf0;
+				pix[2] = (raw << 4) & 0xf0;
+			}
+
+			fwrite(pix, 1, 3, fp);
+		}
+
+	fclose(fp);
+}
+
 static void do_file_header(void)
 {
 	u8 header[0xf0c0];
@@ -35,6 +75,9 @@ static void do_file_header(void)
 
 	if (memcmp(md5_file, md5_calc, 0x10))
 		ERROR("MD5 mismatch");
+
+	output_image(header + 0xc0, 192, 64, "###banner###.ppm");
+	output_image(header + 0x60c0, 48, 48, "###icon###.ppm");
 }
 
 static void do_backup_header(void)
