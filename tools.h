@@ -37,7 +37,7 @@ int check_ecdsa(u8 *Q, u8 *R, u8 *S, u8 *hash);
 void do_yaz0(u8 *in, u32 in_size, u8 *out, u32 out_size);
 
 // error handling
-void fatal(const char *s);
+void fatal(const char *s, ...);
 
 // output formatting
 void print_bytes(u8 *x, u32 n);

@@ -7,6 +7,7 @@
 #include <openssl/md5.h>
 #include <openssl/aes.h>
 #include <openssl/sha.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -57,9 +58,9 @@ void get_key(const char *name, u8 *key, u32 len)
 
 	fp = fopen(path, "rb");
 	if (fp == 0)
-		fatal("cannot open common-key");
+		fatal("cannot open %s", name);
 	if (fread(key, len, 1, fp) != 1)
-		fatal("error reading common-key");
+		fatal("error reading %s", name);
 	fclose(fp);
 }
 
@@ -326,9 +327,15 @@ void do_yaz0(u8 *in, u32 in_size, u8 *out, u32 out_size)
 // error handling
 //
 
-void fatal(const char *s)
+void fatal(const char *s, ...)
 {
-	perror(s);
+	char message[256];
+	va_list ap;
+
+	va_start(ap, s);
+	vsnprintf(message, sizeof message, s, ap);
+
+	perror(message);
 
 	exit(1);
 }
