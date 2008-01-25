@@ -1,22 +1,22 @@
+PROGS = tachtig negentig tpl dol2elf
+COMMON = tools.o bn.o ec.o
+DEFINES = -DLARGE_FILES -D_FILE_OFFSET_BITS=64
+LIBS = -lcrypto
+
 CC = gcc
-CFLAGS = -DLARGE_FILES -D_FILE_OFFSET_BITS=64 -Wall -W -O2
-LDFLAGS = -lcrypto
+CFLAGS = -Wall -W -Os
+LDFLAGS =
 
-LIB = tools.o bn.o ec.o
 
-all: tachtig negentig tpl dol2elf
+OBJS = $(patsubst %,%.o,$(PROGS)) $(COMMON)
 
-tachtig: tachtig.o $(LIB)
+all: $(PROGS)
 
-negentig: negentig.o $(LIB)
+$(PROGS): %: %.o $(COMMON) Makefile
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) $< $(COMMON) -o $@
 
-tpl: tpl.o
-
-dol2elf: dol2elf.o
-
-*.o:	*.c *.h Makefile
+$(OBJS): %.o: %.c tools.h Makefile
+	$(CC) $(CFLAGS) $(DEFINES) -c $< -o $@
 
 clean:
-	-rm -f tachtig negentig tpl dol2elf
-	-rm -f tachtig.o negentig.o tpl.o dol2elf.o
-	-rm -f $(LIB)
+	-rm -f $(OBJS) $(PROGS)
