@@ -370,8 +370,6 @@ void hexdump(u8 *x, u32 n)
 		}
 		fprintf(stderr, "\n");
 	}
-	if (n & 15)
-		fprintf(stderr, "\n");
 }
 
 void dump_tmd(u8 *tmd)
