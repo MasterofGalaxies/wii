@@ -43,5 +43,6 @@ void fatal(const char *s, ...);
 // output formatting
 void print_bytes(u8 *x, u32 n);
 void hexdump(u8 *x, u32 n);
+void dump_tmd(u8 *tmd);
 
 #endif

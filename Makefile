@@ -1,4 +1,4 @@
-PROGS = tachtig negentig tpl dol2elf
+PROGS = tachtig negentig tpl dol2elf tmd-dump
 COMMON = tools.o bn.o ec.o
 DEFINES = -DLARGE_FILES -D_FILE_OFFSET_BITS=64
 LIBS = -lcrypto
