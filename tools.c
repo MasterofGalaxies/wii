@@ -77,7 +77,7 @@ void aes_cbc_dec(u8 *key, u8 *iv, u8 *in, u32 len, u8 *out)
 	AES_cbc_encrypt(in, out, len, &aes_key, iv, AES_DECRYPT);
 }
 
-void decrypt_title_key(u8 *title_key_crypted, u8 *title_id, u8 *title_key)
+void decrypt_title_key(u8 *tik, u8 *title_key)
 {
 	u8 common_key[16];
 	u8 iv[16];
@@ -85,8 +85,8 @@ void decrypt_title_key(u8 *title_key_crypted, u8 *title_id, u8 *title_key)
 	get_key("common-key", common_key, 16);
 
 	memset(iv, 0, sizeof iv);
-	memcpy(iv, title_id, 8);
-	aes_cbc_dec(common_key, iv, title_key_crypted, 16, title_key);
+	memcpy(iv, tik + 0x01dc, 8);
+	aes_cbc_dec(common_key, iv, tik + 0x01bf, 16, title_key);
 }
 
 static u8 root_key[0x204];
@@ -162,6 +162,12 @@ static int check_rsa(u8 *h, u8 *sig, u8 *key, u32 n)
 	u8 x[0x200];
 	static const u8 ber[16] = "\x00\x30\x21\x30\x09\x06\x05\x2b"
 	                          "\x0e\x03\x02\x1a\x05\x00\x04\x14";
+
+//fprintf(stderr, "n = %x\n", n);
+//fprintf(stderr, "key:\n");
+//hexdump(key, n);
+//fprintf(stderr, "sig:\n");
+//hexdump(sig, n);
 
 	correct[0] = 0;
 	correct[1] = 1;

@@ -447,9 +447,7 @@ static void do_partition(void)
 		errors |= 0x40;
 	}
 
-	// XXX: we should check the cert chain here
-
-	decrypt_title_key(tik + 0x01bf, tik + 0x01dc, disc_key);
+	decrypt_title_key(tik, disc_key);
 
 	partition_raw_read(h3_offset, h3, 0x18000);
 
