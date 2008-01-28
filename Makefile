@@ -13,7 +13,7 @@ OBJS = $(patsubst %,%.o,$(PROGS)) $(COMMON)
 all: $(PROGS)
 
 $(PROGS): %: %.o $(COMMON) Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) $< $(COMMON) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(COMMON) $(LIBS) -o $@
 
 $(OBJS): %.o: %.c tools.h Makefile
 	$(CC) $(CFLAGS) $(DEFINES) -c $< -o $@
