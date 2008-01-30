@@ -2,6 +2,9 @@
 // Licensed under the terms of the GNU GPL, version 2
 // http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,6 +28,8 @@ static void output_image(u8 *data, u32 w, u32 h, const char *name)
 	u32 x, y;
 
 	fp = fopen(name, "wb");
+	if (!fp)
+		fatal("open %s", name);
 
 	fprintf(fp, "P6 %d %d 255\n", w, h);
 
@@ -53,7 +58,8 @@ static void output_image(u8 *data, u32 w, u32 h, const char *name)
 				pix[2] = (raw << 4) & 0xf0;
 			}
 
-			fwrite(pix, 1, 3, fp);
+			if (fwrite(pix, 3, 1, fp) != 1)
+				fatal("write %s", name);
 		}
 
 	fclose(fp);
@@ -65,7 +71,8 @@ static void do_file_header(void)
 	u8 md5_file[16];
 	u8 md5_calc[16];
 
-	fread(header, 1, sizeof header, fp);
+	if (fread(header, sizeof header, 1, fp) != 1)
+		fatal("read file header");
 
 	aes_cbc_dec(sd_key, sd_iv, header, sizeof header, header);
 
@@ -84,7 +91,8 @@ static void do_backup_header(void)
 {
 	u8 header[0x80];
 
-	fread(header, 1, sizeof header, fp);
+	if (fread(header, sizeof header, 1, fp) != 1)
+		fatal("read backup header");
 
 	if (be32(header + 4) != 0x426b0001)
 		ERROR("no Bk header");
@@ -110,7 +118,8 @@ static void do_file(void)
 	u8 *data;
 	FILE *out;
 
-	fread(header, 1, sizeof header, fp);
+	if (fread(header, sizeof header, 1, fp) != 1)
+		fatal("read file header");
 
 	if (be32(header) != 0x03adf17e)
 		ERROR("bad file header");
@@ -128,12 +137,18 @@ static void do_file(void)
 
 	rounded_size = (size + 63) & ~63;
 	data = malloc(rounded_size);
-	fread(data, 1, rounded_size, fp);
+	if (!data)
+		fatal("malloc");
+	if (fread(data, rounded_size, 1, fp) != 1)
+		fatal("read file data for %s", name);
 
 	aes_cbc_dec(sd_key, header + 0x50, data, rounded_size, data);
 
 	out = fopen(name, "wb");
-	fwrite(data, 1, size, out);
+	if (!out)
+		fatal("open %s", name);
+	if (fwrite(data, size, 1, out) != 1)
+		fatal("write %s", name);
 	fclose(out);
 
 	free(data);
@@ -149,15 +164,21 @@ static void do_sig(void)
 	u32 data_size;
 	int ok;
 
-	fread(sig, 1, sizeof sig, fp);
-	fread(ng_cert, 1, sizeof ng_cert, fp);
-	fread(ap_cert, 1, sizeof ap_cert, fp);
+	if (fread(sig, sizeof sig, 1, fp) != 1)
+		fatal("read signature");
+	if (fread(ng_cert, sizeof ng_cert, 1, fp) != 1)
+		fatal("read NG cert");
+	if (fread(ap_cert, sizeof ap_cert, 1, fp) != 1)
+		fatal("read AP cert");
 
 	data_size = total_size - 0x340;
 
 	data = malloc(data_size);
+	if (!data)
+		fatal("malloc");
 	fseek(fp, 0xf0c0, SEEK_SET);
-	fread(data, 1, data_size, fp);
+	if (fread(data, data_size, 1, fp) != 1)
+		fatal("read data for sig check");
 	sha(data, data_size, hash);
 	sha(hash, 20, hash);
 	free(data);
@@ -170,16 +191,33 @@ int main(int argc, char **argv)
 {
 	u32 i;
 
+	if (argc != 3) {
+		fprintf(stderr, "Usage: %s <data.bin> <destdir>\n", argv[0]);
+		return 1;
+	}
+
 	get_key("sd-key", sd_key, 16);
 	get_key("sd-iv", sd_iv, 16);
 	get_key("md5-blanker", md5_blanker, 16);
 
 	fp = fopen(argv[1], "rb");
+	if (!fp)
+		fatal("open %s", argv[1]);
 
 	do_file_header();
 	do_backup_header();
+
+	if (mkdir(argv[2], 0777))
+		fatal("mkdir %s", argv[2]);
+	if (chdir(argv[2]))
+		fatal("chdir %s", argv[2]);
+
 	for (i = 0; i < n_files; i++)
 		do_file();
+
+	if (chdir(".."))
+		fatal("chdir ..");
+
 	do_sig();
 
 	fclose(fp);
