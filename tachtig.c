@@ -204,13 +204,13 @@ int main(int argc, char **argv)
 	if (!fp)
 		fatal("open %s", argv[1]);
 
-	do_file_header();
-	do_backup_header();
-
 	if (mkdir(argv[2], 0777))
 		fatal("mkdir %s", argv[2]);
 	if (chdir(argv[2]))
 		fatal("chdir %s", argv[2]);
+
+	do_file_header();
+	do_backup_header();
 
 	for (i = 0; i < n_files; i++)
 		do_file();
