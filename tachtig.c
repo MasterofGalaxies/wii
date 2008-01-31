@@ -70,7 +70,10 @@ static void do_file_header(void)
 	u8 header[0xf0c0];
 	u8 md5_file[16];
 	u8 md5_calc[16];
+	u32 header_size;
+	char name[256];
 	FILE *out;
+	u32 i;
 
 	if (fread(header, sizeof header, 1, fp) != 1)
 		fatal("read file header");
@@ -84,6 +87,10 @@ static void do_file_header(void)
 	if (memcmp(md5_file, md5_calc, 0x10))
 		ERROR("MD5 mismatch");
 
+	header_size = be32(header + 8);
+	if (header_size != 0x72a0 && header_size != 0xf0a0)
+		ERROR("unknown file header size");
+
 	out = fopen("###title###", "wb");
 	if (!out)
 		fatal("open ###title###");
@@ -92,7 +99,13 @@ static void do_file_header(void)
 	fclose(out);
 
 	output_image(header + 0xc0, 192, 64, "###banner###.ppm");
-	output_image(header + 0x60c0, 48, 48, "###icon###.ppm");
+	if (header_size == 0x72a0)
+		output_image(header + 0x60c0, 48, 48, "###icon###.ppm");
+	else
+		for (i = 0; i < 8; i++) {
+			snprintf(name, sizeof name, "###icon%d###.ppm", i);
+			output_image(header + 0x60c0 + 0x1200*i, 48, 48, name);
+		}
 }
 
 static void do_backup_header(void)
