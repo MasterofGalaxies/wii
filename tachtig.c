@@ -21,6 +21,7 @@ static FILE *fp;
 static u32 n_files;
 static u32 files_size;
 static u32 total_size;
+static u8 header[0xf0c0];
 
 static void output_image(u8 *data, u32 w, u32 h, const char *name)
 {
@@ -67,11 +68,11 @@ static void output_image(u8 *data, u32 w, u32 h, const char *name)
 
 static void do_file_header(void)
 {
-	u8 header[0xf0c0];
 	u8 md5_file[16];
 	u8 md5_calc[16];
 	u32 header_size;
 	char name[256];
+	char dir[17];
 	FILE *out;
 	u32 i;
 
@@ -90,6 +91,12 @@ static void do_file_header(void)
 	header_size = be32(header + 8);
 	if (header_size != 0x72a0 && header_size != 0xf0a0)
 		ERROR("unknown file header size");
+
+	snprintf(dir, sizeof dir, "%016llx", be64(header));
+	if (mkdir(dir, 0777))
+		fatal("mkdir %s", dir);
+	if (chdir(dir))
+		fatal("chdir %s", dir);
 
 	out = fopen("###title###", "wb");
 	if (!out)
@@ -138,9 +145,9 @@ static mode_t perm_to_mode(u8 perm)
 	for (i = 0; i < 3; i++) {
 		mode <<= 3;
 		if (perm & 0x20)
-			mode |= 2;
+			mode |= 3;
 		if (perm & 0x10)
-			mode |= 4;
+			mode |= 5;
 		perm <<= 2;
 	}
 
@@ -192,13 +199,14 @@ static void do_file(void)
 			fatal("write %s", name);
 		fclose(out);
 
+		mode &= ~0111;
+
 		free(data);
 		break;
 
 	case 2:
 		if (mkdir(name, 0777))
 			fatal("mkdir %s", name);
-		mode |= 0111;
 		break;
 
 	default:
@@ -245,9 +253,10 @@ static void do_sig(void)
 int main(int argc, char **argv)
 {
 	u32 i;
+	u32 mode;
 
-	if (argc != 3) {
-		fprintf(stderr, "Usage: %s <data.bin> <destdir>\n", argv[0]);
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <data.bin>\n", argv[0]);
 		return 1;
 	}
 
@@ -259,17 +268,15 @@ int main(int argc, char **argv)
 	if (!fp)
 		fatal("open %s", argv[1]);
 
-	if (mkdir(argv[2], 0777))
-		fatal("mkdir %s", argv[2]);
-	if (chdir(argv[2]))
-		fatal("chdir %s", argv[2]);
-
 	do_file_header();
 	do_backup_header();
 
 	for (i = 0; i < n_files; i++)
 		do_file();
 
+	mode = perm_to_mode(header[0x0c]);
+	if (chmod(".", mode))
+		fatal("chmod .");
 	if (chdir(".."))
 		fatal("chdir ..");
 
