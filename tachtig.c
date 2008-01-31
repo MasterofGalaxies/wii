@@ -153,26 +153,36 @@ static void do_file(void)
 
 	mode = perm_to_mode(perm);
 
-	if (type != 1)
-		ERROR("unhandled: file type != 1");
+	switch (type) {
+	case 1:
+		rounded_size = (size + 63) & ~63;
+		data = malloc(rounded_size);
+		if (!data)
+			fatal("malloc");
+		if (fread(data, rounded_size, 1, fp) != 1)
+			fatal("read file data for %s", name);
 
-	rounded_size = (size + 63) & ~63;
-	data = malloc(rounded_size);
-	if (!data)
-		fatal("malloc");
-	if (fread(data, rounded_size, 1, fp) != 1)
-		fatal("read file data for %s", name);
+		aes_cbc_dec(sd_key, header + 0x50, data, rounded_size, data);
 
-	aes_cbc_dec(sd_key, header + 0x50, data, rounded_size, data);
+		out = fopen(name, "wb");
+		if (!out)
+			fatal("open %s", name);
+		if (fwrite(data, size, 1, out) != 1)
+			fatal("write %s", name);
+		fclose(out);
 
-	out = fopen(name, "wb");
-	if (!out)
-		fatal("open %s", name);
-	if (fwrite(data, size, 1, out) != 1)
-		fatal("write %s", name);
-	fclose(out);
+		free(data);
+		break;
 
-	free(data);
+	case 2:
+		if (mkdir(name, 0777))
+			fatal("mkdir %s", name);
+		mode |= 0111;
+		break;
+
+	default:
+		ERROR("unhandled file type");
+	}
 
 	if (chmod(name, mode))
 		fatal("chmod %s", name);
