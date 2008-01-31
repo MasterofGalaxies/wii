@@ -301,6 +301,7 @@ void do_yaz0(u8 *in, u32 in_size, u8 *out, u32 out_size)
 	u32 nbits;
 	u32 n, d, i;
 
+	bits = 0;
 	nbits = 0;
 	in += 0x10;
 	for (nout = 0; nout < out_size; ) {
