@@ -70,6 +70,7 @@ static void do_file_header(void)
 	u8 header[0xf0c0];
 	u8 md5_file[16];
 	u8 md5_calc[16];
+	FILE *out;
 
 	if (fread(header, sizeof header, 1, fp) != 1)
 		fatal("read file header");
@@ -82,6 +83,13 @@ static void do_file_header(void)
 
 	if (memcmp(md5_file, md5_calc, 0x10))
 		ERROR("MD5 mismatch");
+
+	out = fopen("###title###", "wb");
+	if (!out)
+		fatal("open ###title###");
+	if (fwrite(header + 0x40, 0x80, 1, out) != 1)
+		fatal("write ###title###");
+	fclose(out);
 
 	output_image(header + 0xc0, 192, 64, "###banner###.ppm");
 	output_image(header + 0x60c0, 48, 48, "###icon###.ppm");
