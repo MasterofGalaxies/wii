@@ -108,6 +108,24 @@ static void do_backup_header(void)
 	fprintf(stderr, "%d files\n", n_files);
 }
 
+static mode_t perm_to_mode(u8 perm)
+{
+	mode_t mode;
+	u32 i;
+
+	mode = 0;
+	for (i = 0; i < 3; i++) {
+		mode <<= 3;
+		if (perm & 0x20)
+			mode |= 2;
+		if (perm & 0x10)
+			mode |= 4;
+		perm <<= 2;
+	}
+
+	return mode;
+}
+
 static void do_file(void)
 {
 	u8 header[0x80];
@@ -117,6 +135,7 @@ static void do_file(void)
 	char *name;
 	u8 *data;
 	FILE *out;
+	mode_t mode;
 
 	if (fread(header, sizeof header, 1, fp) != 1)
 		fatal("read file header");
@@ -131,6 +150,8 @@ static void do_file(void)
 	name = header + 11;
 
 	fprintf(stderr, "file: size=%08x perm=%02x attr=%02x type=%02x name=%s\n", size, perm, attr, type, name);
+
+	mode = perm_to_mode(perm);
 
 	if (type != 1)
 		ERROR("unhandled: file type != 1");
@@ -152,6 +173,9 @@ static void do_file(void)
 	fclose(out);
 
 	free(data);
+
+	if (chmod(name, mode))
+		fatal("chmod %s", name);
 }
 
 static void do_sig(void)
