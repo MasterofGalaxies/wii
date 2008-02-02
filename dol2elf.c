@@ -6,26 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-
-static u32 be32(u8 *p)
-{
-	return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
-}
-
-static void wbe16(u8 *p, u16 x)
-{
-	p[0] = x >> 8;
-	p[1] = x;
-}
-
-static void wbe32(u8 *p, u32 x)
-{
-	wbe16(p, x >> 16);
-	wbe16(p + 2, x);
-}
+#include "tools.h"
 
 struct section {
 	u32 addr;

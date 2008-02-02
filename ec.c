@@ -366,7 +366,7 @@ int check_ecdsa(u8 *Q, u8 *R, u8 *S, u8 *hash)
 	return (bn_compare(r1, R, 30) == 0);
 }
 
-static void ec_priv_to_pub(u8 *Q, u8 *k)
+void ec_priv_to_pub(u8 *k, u8 *Q)
 {
 	point_mul(Q, k, ec_G);
 }

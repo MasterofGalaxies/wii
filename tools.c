@@ -36,6 +36,24 @@ u64 be34(u8 *p)
 	return 4 * (u64)be32(p);
 }
 
+void wbe16(u8 *p, u16 x)
+{
+	p[0] = x >> 8;
+	p[1] = x;
+}
+
+void wbe32(u8 *p, u32 x)
+{
+	wbe16(p, x >> 16);
+	wbe16(p + 2, x);
+}
+
+void wbe64(u8 *p, u64 x)
+{
+	wbe32(p, x >> 32);
+	wbe32(p + 4, x);
+}
+
 //
 // crypto
 //
@@ -75,6 +93,14 @@ void aes_cbc_dec(u8 *key, u8 *iv, u8 *in, u32 len, u8 *out)
 
 	AES_set_decrypt_key(key, 128, &aes_key);
 	AES_cbc_encrypt(in, out, len, &aes_key, iv, AES_DECRYPT);
+}
+
+void aes_cbc_enc(u8 *key, u8 *iv, u8 *in, u32 len, u8 *out)
+{
+	AES_KEY aes_key;
+
+	AES_set_encrypt_key(key, 128, &aes_key);
+	AES_cbc_encrypt(in, out, len, &aes_key, iv, AES_ENCRYPT);
 }
 
 void decrypt_title_key(u8 *tik, u8 *title_key)
