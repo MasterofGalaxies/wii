@@ -21,6 +21,7 @@ static u8 sd_iv[16];
 static u8 md5_blanker[16];
 
 static u32 ng_id;
+static u32 ng_key_id;
 static u8 ng_mac[6];
 static u8 ng_priv[30];
 static u8 ng_sig[60];
@@ -296,7 +297,8 @@ static void do_file(u32 file_no)
 	}
 }
 
-static void make_ec_cert(u8 *cert, u8 *sig, char *signer, char *name, u8 *priv)
+static void make_ec_cert(u8 *cert, u8 *sig, char *signer, char *name, u8 *priv,
+                         u32 key_id)
 {
 	memset(cert, 0, 0x180);
 	wbe32(cert, 0x10002);
@@ -304,7 +306,7 @@ static void make_ec_cert(u8 *cert, u8 *sig, char *signer, char *name, u8 *priv)
 	strcpy(cert + 0x80, signer);
 	wbe32(cert + 0xc0, 2);
 	strcpy(cert + 0xc4, name);
-	wbe32(cert + 0x104, 0);		// key id
+	wbe32(cert + 0x104, key_id);
 	ec_priv_to_pub(priv, cert + 0x108);
 }
 
@@ -323,7 +325,7 @@ static void do_sig(void)
 
 	sprintf(signer, "Root-CA00000001-MS00000002");
 	sprintf(name, "NG%08x", ng_id);
-	make_ec_cert(ng_cert, ng_sig, signer, name, ng_priv);
+	make_ec_cert(ng_cert, ng_sig, signer, name, ng_priv, ng_key_id);
 
 	memset(ap_priv, 0, sizeof ap_priv);
 	ap_priv[10] = 1;
@@ -332,11 +334,11 @@ static void do_sig(void)
 
 	sprintf(signer, "Root-CA00000001-MS00000002-NG%08x", ng_id);
 	sprintf(name, "AP%08x%08x", 1, 2);
-	make_ec_cert(ap_cert, ap_sig, signer, name, ap_priv);
+	make_ec_cert(ap_cert, ap_sig, signer, name, ap_priv, 0);
 
 	sha(ap_cert + 0x80, 0x100, hash);
 	generate_ecdsa(ap_sig, ap_sig + 30, ng_priv, hash);
-	make_ec_cert(ap_cert, ap_sig, signer, name, ap_priv);
+	make_ec_cert(ap_cert, ap_sig, signer, name, ap_priv, 0);
 
 	data_size = files_size + 0x80;
 
@@ -378,6 +380,8 @@ int main(int argc, char **argv)
 
 	get_key("default/NG-id", tmp, 4);
 	ng_id = be32(tmp);
+	get_key("default/NG-key-id", tmp, 4);
+	ng_key_id = be32(tmp);
 	get_key("default/NG-mac", ng_mac, 6);
 	get_key("default/NG-priv", ng_priv, 30);
 	get_key("default/NG-sig", ng_sig, 60);
