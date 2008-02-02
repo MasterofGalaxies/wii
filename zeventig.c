@@ -20,7 +20,7 @@ static u8 *get_wad(u32 len)
 	u32 rounded_len;
 	u8 *p;
 
-	rounded_len = (len + 0x3f) & ~0x3f;
+	rounded_len = round_up(len, 0x40);
 	p = malloc(rounded_len);
 	if (p == 0)
 		fatal("malloc");
@@ -82,7 +82,7 @@ static void do_app_file(u8 *app, u32 app_len, u8 *tik, u8 *tmd)
 		index = be16(tmd + 0x01e8 + 0x24*i);
 		type = be16(tmd + 0x01ea + 0x24*i);
 		len = be64(tmd + 0x01ec + 0x24*i);
-		rounded_len = (len + 0x3f) & ~0x3f;
+		rounded_len = round_up(len, 0x40);
 		fprintf(stderr, "--- cid=%08x index=%04x type=%04x len=%08x\n",
 		        cid, index, type, len);
 

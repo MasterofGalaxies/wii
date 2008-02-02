@@ -34,7 +34,7 @@ static void i4(int w, int h, int o, char *name)
 			u8 pix[3];
 			u16 raw;
 			int x0, x1, y0, y1, off;
-			int ww = (w + 7) & ~7;
+			int ww = round_up(w, 8);
 
 			x0 = x & 7;
 			x1 = x >> 3;
@@ -72,7 +72,7 @@ static void i8(int w, int h, int o, char *name)
 			u8 pix[3];
 			u16 raw;
 			int x0, x1, y0, y1, off;
-			int ww = (w + 7) & ~7;
+			int ww = round_up(w, 8);
 
 			x0 = x & 7;
 			x1 = x >> 3;
@@ -106,7 +106,7 @@ static void ia4(int w, int h, int o, char *name)
 			u8 pix[3];
 			u16 raw;
 			int x0, x1, y0, y1, off;
-			int ww = (w + 7) & ~7;
+			int ww = round_up(w, 8);
 
 			x0 = x & 7;
 			x1 = x >> 3;
@@ -143,7 +143,7 @@ static void rgb5a3(int w, int h, int o, char *name)
 			u8 pix[3];
 			u16 raw;
 			int x0, x1, y0, y1, off;
-			int ww = (w + 3) & ~3;
+			int ww = round_up(w, 4);
 
 			x0 = x & 3;
 			x1 = x >> 2;
@@ -209,7 +209,7 @@ static void cmp(int w, int h, int o, char *name)
 			u16 raw;
 			u16 c[4];
 			int x0, x1, x2, y0, y1, y2, off;
-			int ww = (w + 7) & ~7;
+			int ww = round_up(w, 8);
 			int ix;
 			u32 px;
 
