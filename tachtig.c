@@ -89,8 +89,9 @@ static void do_file_header(void)
 		ERROR("MD5 mismatch");
 
 	header_size = be32(header + 8);
-	if (header_size != 0x72a0 && header_size != 0xf0a0)
-		ERROR("unknown file header size");
+	if (header_size < 0x72a0 || header_size > 0xf0a0
+	    || (header_size - 0x60a0) % 0x1200 != 0)
+		ERROR("bad file header size");
 
 	snprintf(dir, sizeof dir, "%016llx", be64(header));
 	if (mkdir(dir, 0777))
@@ -109,7 +110,7 @@ static void do_file_header(void)
 	if (header_size == 0x72a0)
 		output_image(header + 0x60c0, 48, 48, "###icon###.ppm");
 	else
-		for (i = 0; i < 8; i++) {
+		for (i = 0; 0x1200*i + 0x60c0 < header_size; i++) {
 			snprintf(name, sizeof name, "###icon%d###.ppm", i);
 			output_image(header + 0x60c0 + 0x1200*i, 48, 48, name);
 		}
