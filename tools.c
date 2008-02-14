@@ -4,6 +4,7 @@
 
 #include "tools.h"
 
+#include <stddef.h>	// to accommodate certain broken versions of openssl
 #include <openssl/md5.h>
 #include <openssl/aes.h>
 #include <openssl/sha.h>
