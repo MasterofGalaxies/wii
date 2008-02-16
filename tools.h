@@ -11,10 +11,10 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
-u16 be16(u8 *p);
-u32 be32(u8 *p);
-u64 be64(u8 *p);
-u64 be34(u8 *p);
+u16 be16(const u8 *p);
+u32 be32(const u8 *p);
+u64 be64(const u8 *p);
+u64 be34(const u8 *p);
 
 void wbe16(u8 *p, u16 x);
 void wbe32(u8 *p, u32 x);

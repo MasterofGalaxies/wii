@@ -17,22 +17,22 @@
 // basic data types
 //
 
-u16 be16(u8 *p)
+u16 be16(const u8 *p)
 {
 	return (p[0] << 8) | p[1];
 }
 
-u32 be32(u8 *p)
+u32 be32(const u8 *p)
 {
 	return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
 }
 
-u64 be64(u8 *p)
+u64 be64(const u8 *p)
 {
 	return ((u64)be32(p) << 32) | be32(p + 4);
 }
 
-u64 be34(u8 *p)
+u64 be34(const u8 *p)
 {
 	return 4 * (u64)be32(p);
 }
