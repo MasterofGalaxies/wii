@@ -18,13 +18,8 @@ static void slot_checksum(u8 *x)
 		sum += x[i];
 	nsum = -(sum + 0x0a8c);
 
-	if (be32(x + 0x0a8c) == sum && be32(x + 0x0a90) == nsum)
-		fprintf(stderr, "slot checksum OK\n");
-	else {
-		fprintf(stderr, "slot checksum FIXED\n");
-		wbe32(x + 0x0a8c, sum);
-		wbe32(x + 0x0a90, nsum);
-	}
+	wbe32(x + 0x0a8c, sum);
+	wbe32(x + 0x0a90, nsum);
 }
 
 static void save_checksum(u8 *x)
@@ -41,13 +36,8 @@ static void save_checksum(u8 *x)
 		sum += be16(x + 2*i);
 	nsum = -(sum + 0x0ffe);
 
-	if (be16(x + 0x1ffc) == sum && be16(x + 0x1ffe) == nsum)
-		fprintf(stderr, "save checksum OK\n");
-	else {
-		fprintf(stderr, "save checksum FIXED\n");
-		wbe16(x + 0x1ffc, sum);
-		wbe16(x + 0x1ffe, nsum);
-	}
+	wbe16(x + 0x1ffc, sum);
+	wbe16(x + 0x1ffe, nsum);
 }
 
 int main(int argc, char **argv)
