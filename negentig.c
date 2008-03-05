@@ -270,7 +270,7 @@ static void do_fst_file(const char *name, u64 offset, u64 size)
 	fp = fopen(name, "wb");
 	if (fp == 0)
 		fatal("cannot open output file");
-	if (fwrite(data, size, 1, fp) != 1)
+	if (size && fwrite(data, size, 1, fp) != 1)
 		fatal("error writing output file");
 	fclose(fp);
 
