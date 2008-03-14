@@ -319,25 +319,38 @@ void generate_ecdsa(u8 *R, u8 *S, u8 *k, u8 *hash)
 {
 	u8 e[30];
 	u8 kk[30];
+	u8 m[30];
+	u8 minv[30];
+	u8 mG[60];
+	FILE *fp;
 
 	elt_zero(e);
 	memcpy(e + 10, hash, 20);
 
-	// should take random m --> but we take 1
-	//	R = (mG).x
-	//	S = m**-1*(e + Rk) (mod N)
-	// so, we get:
-	//	R = G.x
-	//	S = e + Rk (mod N)
+	fp = fopen("/dev/random", "rb");
+	if (fread(m, sizeof m, 1, fp) != 1)
+		fatal("reading random");
+	fclose(fp);
+	m[0] = 0;
+	fprintf(stderr, "m:\n");
+	hexdump(m, 30);
 
-	elt_copy(R, ec_G);
+	//	R = (mG).x
+
+	point_mul(mG, m, ec_G);
+	elt_copy(R, mG);
 	if (bn_compare(R, ec_N, 30) >= 0)
 		bn_sub_modulus(R, ec_N, 30);
+
+	//	S = m**-1*(e + Rk) (mod N)
+
 	elt_copy(kk, k);
 	if (bn_compare(kk, ec_N, 30) >= 0)
 		bn_sub_modulus(kk, ec_N, 30);
 	bn_mul(S, R, kk, ec_N, 30);
-	bn_add(S, S, e, ec_N, 30);
+	bn_add(kk, S, e, ec_N, 30);
+	bn_inv(minv, m, ec_N, 30);
+	bn_mul(S, minv, kk, ec_N, 30);
 }
 
 int check_ecdsa(u8 *Q, u8 *R, u8 *S, u8 *hash)
