@@ -332,8 +332,6 @@ void generate_ecdsa(u8 *R, u8 *S, u8 *k, u8 *hash)
 		fatal("reading random");
 	fclose(fp);
 	m[0] = 0;
-	fprintf(stderr, "m:\n");
-	hexdump(m, 30);
 
 	//	R = (mG).x
 
