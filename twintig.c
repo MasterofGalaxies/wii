@@ -12,6 +12,8 @@
 
 #include "tools.h"
 
+static int verbose = 0;
+
 #define MAXFILES 1000
 
 #define ERROR(s) do { fprintf(stderr, s "\n"); exit(1); } while (0)
@@ -265,9 +267,10 @@ static void do_file(u32 file_no)
 	type = header[10];
 	name = header + 11;
 
-	fprintf(stderr,
-	        "file: size=%08x perm=%02x attr=%02x type=%02x name=%s\n",
-	         size, perm, attr, type, name);
+	if (verbose)
+		printf(
+		    "file: size=%08x perm=%02x attr=%02x type=%02x name=%s\n",
+		    size, perm, attr, type, name);
 
 	if (fwrite(header, 0x80, 1, fp) != 1)
 		fatal("write file header %d", file_no);
