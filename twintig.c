@@ -36,6 +36,7 @@ static u32 n_files;
 static u32 files_size;
 
 static u8 files[MAXFILES][0x80];
+static char src[MAXFILES][256];
 
 static void read_image(u8 *data, u32 w, u32 h, const char *name)
 {
@@ -102,44 +103,78 @@ static u8 perm_from_path(const char *path)
 	return perm;
 }
 
-static void do_file_header(u64 title_id)
+static void do_file_header(u64 title_id, FILE *toc)
 {
-	u8 md5_calc[16];
-	FILE *in;
-	char name[256];
-	u32 i;
-
 	memset(header, 0, sizeof header);
 
 	wbe64(header, title_id);
-	header[0x0c] = perm_from_path(".");
+	header[0x0c] = (toc ? 0x35 : perm_from_path("."));
 	memcpy(header + 0x0e, md5_blanker, 16);
 	memcpy(header + 0x20, "WIBN", 4);
 	// XXX: what about the stuff at 0x24?
 
-	in = fopen("###title###", "rb");
+
+	char name[256];
+	FILE *in;
+
+
+	if (toc) {
+		if (!fgets(name, sizeof name, toc))
+			fatal("reading title file name");
+		name[strlen(name) - 1] = 0;	// get rid of linefeed
+	} else
+		strcpy(name, "###title###");
+
+	in = fopen(name, "rb");
 	if (!in)
-		fatal("open ###title###");
+		fatal("open %s", name);
 	if (fread(header + 0x40, 0x80, 1, in) != 1)
-		fatal("read ###title###");
+		fatal("read %s", name);
 	fclose(in);
 
-	read_image(header + 0xc0, 192, 64, "###banner###.ppm");
 
-	in = fopen("###icon###.ppm", "rb");
-	if (in) {
-		fclose(in);
+	if (toc) {
+		if (!fgets(name, sizeof name, toc))
+			fatal("reading banner file name");
+		name[strlen(name) - 1] = 0;	// get rid of linefeed
+	} else
+		strcpy(name, "###banner###.ppm");
+
+	read_image(header + 0xc0, 192, 64, name);
+
+
+	if (toc) {
+		if (!fgets(name, sizeof name, toc))
+			fatal("reading icon file name");
+		name[strlen(name) - 1] = 0;	// get rid of linefeed
+	} else
+		strcpy(name, "###icon###.ppm");
+
+	int have_anim_icon = 0;
+
+	if (toc == 0) {
+		in = fopen(name, "rb");
+		if (in)
+			fclose(in);
+		else
+			have_anim_icon = 1;
+	}
+
+	if (!have_anim_icon) {
 		wbe32(header + 8, 0x72a0);
-		read_image(header + 0x60c0, 48, 48, "###icon###.ppm");
+		read_image(header + 0x60c0, 48, 48, name);
 	} else {
 		wbe32(header + 8, 0xf0a0);
 
+		u32 i;
 		for (i = 0; i < 8; i++) {
 			snprintf(name, sizeof name, "###icon%d###.ppm", i);
 			read_image(header + 0x60c0 + 0x1200*i, 48, 48, name);
 		}
 	}
 
+
+	u8 md5_calc[16];
 	md5(header, sizeof header, md5_calc);
 	memcpy(header + 0x0e, md5_calc, 16);
 	aes_cbc_enc(sd_key, sd_iv, header, sizeof header, header);
@@ -193,6 +228,8 @@ static void find_files_recursive(const char *path)
 			size = sb.st_size;
 		}
 
+		strcpy(src[n_files], name);
+
 		p = files[n_files++];
 		wbe32(p, 0x3adf17e);
 		wbe32(p + 4, size);
@@ -227,6 +264,71 @@ static void find_files(void)
 	find_files_recursive(0);
 
 	qsort(files, n_files, 0x80, compar);
+}
+
+static u32 wiggle_name(char *name)
+{
+	//XXX: encode embedded zeroes, etc.
+	return strlen(name);
+}
+
+static void find_files_toc(FILE *toc)
+{
+	n_files = 0;
+	files_size = 0;
+
+	memset(files, 0, sizeof files);
+
+	u32 len;
+	int is_dir;
+	u8 *p;
+	struct stat sb;
+	u32 size;
+
+	char line[256];
+
+	while (fgets(line, sizeof line, toc)) {
+		line[strlen(line) - 1] = 0;	// get rid of linefeed
+
+		char *name;
+		for (name = line; *name; name++)
+			if (*name == ' ')
+				break;
+		if (!*name)
+			ERROR("no space in TOC line");
+		*name = 0;
+		name++;
+
+		len = wiggle_name(name);
+		if (len >= 53)
+			ERROR("path too long");
+
+		if (stat(line, &sb))
+			fatal("stat %s", line);
+
+		is_dir = S_ISDIR(sb.st_mode);
+
+		size = (is_dir ? 0 : sb.st_size);
+
+		strcpy(src[n_files], line);
+
+		p = files[n_files++];
+		wbe32(p, 0x3adf17e);
+		wbe32(p + 4, size);
+		p[8] = 0x35;	// rwr-r-
+		p[0x0a] = is_dir ? 2 : 1;
+		memcpy(p + 0x0b, name, len);
+		// maybe fill up with dirt
+
+		size = round_up(size, 0x40);
+		files_size += 0x80 + size;
+
+		//if (is_dir)
+		//	find_files_recursive(name);
+	}
+
+	if (ferror(toc))
+		fatal("reading toc");
 }
 
 static void do_backup_header(u64 title_id)
@@ -275,6 +377,8 @@ static void do_file(u32 file_no)
 	if (fwrite(header, 0x80, 1, fp) != 1)
 		fatal("write file header %d", file_no);
 
+	char *from = src[file_no];
+
 	if (type == 1) {
 		rounded_size = round_up(size, 0x40);
 
@@ -282,11 +386,11 @@ static void do_file(u32 file_no)
 		if (!data)
 			fatal("malloc data");
 
-		in = fopen(name, "rb");
+		in = fopen(from, "rb");
 		if (!in)
-			fatal("open %s", name);
+			fatal("open %s", from);
 		if (fread(data, size, 1, in) != 1)
-			fatal("read %s", name);
+			fatal("read %s", from);
 		fclose(in);
 
 		memset(data + size, 0, rounded_size - size);
@@ -372,9 +476,17 @@ int main(int argc, char **argv)
 	u8 tmp[4];
 	u32 i;
 
-	if (argc != 3) {
+	if (argc != 3 && argc != 4) {
 		fprintf(stderr, "Usage: %s <srcdir> <data.bin>\n", argv[0]);
+		fprintf(stderr, "or: %s <srcdir> <data.bin> <toc>\n", argv[0]);
 		return 1;
+	}
+
+	FILE *toc = 0;
+	if (argc == 4) {
+		toc = fopen(argv[3], "r");
+		if (!toc)
+			fatal("open %s", argv[3]);
 	}
 
 	get_key("sd-key", sd_key, 16);
@@ -396,20 +508,28 @@ int main(int argc, char **argv)
 	if (!fp)
 		fatal("open %s", argv[2]);
 
-	if (chdir(argv[1]))
-		fatal("chdir %s", argv[1]);
+	if (!toc) {
+		if (chdir(argv[1]))
+			fatal("chdir %s", argv[1]);
+	}
 
-	do_file_header(title_id);
+	do_file_header(title_id, toc);
 
-	find_files();
+	if (toc)
+		find_files_toc(toc);
+	else
+		find_files();
 
 	do_backup_header(title_id);
 
 	for (i = 0; i < n_files; i++)
 		do_file(i);
 
-	if (chdir(".."))
-		fatal("chdir ..");
+	// XXX: is this needed?
+	if (!toc) {
+		if (chdir(".."))
+			fatal("chdir ..");
+	}
 
 	do_sig();
 
