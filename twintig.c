@@ -166,13 +166,18 @@ static void do_file_header(u64 title_id, FILE *toc)
 		wbe32(header + 8, 0x72a0);
 		read_image(header + 0x60c0, 48, 48, name);
 	} else {
-		wbe32(header + 8, 0xf0a0);
-
 		u32 i;
 		for (i = 0; i < 8; i++) {
 			snprintf(name, sizeof name, "###icon%d###.ppm", i);
-			read_image(header + 0x60c0 + 0x1200*i, 48, 48, name);
+			FILE *fp = fopen(name, "rb");
+			if (fp) {
+				fclose(fp);
+				read_image(header + 0x60c0 + 0x1200*i, 48, 48, name);
+			} else
+				break;
 		}
+
+		wbe32(header + 8, 0x60a0 + 0x1200*i);
 	}
 
 
