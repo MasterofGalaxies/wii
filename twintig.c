@@ -48,7 +48,9 @@ static void read_image(u8 *data, u32 w, u32 h, const char *name)
 	if (!fp)
 		fatal("open %s", name);
 
-	if (fscanf(fp, "P6 %d %d 255\n", &ww, &hh) != 2)
+	if (fscanf(fp, "P6 %d %d 255", &ww, &hh) != 2)
+		ERROR("bad ppm");
+	if (getc(fp) != '\n')
 		ERROR("bad ppm");
 	if (ww != w || hh != h)
 		ERROR("wrong size ppm");
