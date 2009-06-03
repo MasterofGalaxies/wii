@@ -1,5 +1,5 @@
 PROGS = twintig zestig zeventig tachtig negentig
-PROGS += tpl2ppm dol2elf tmd-dump zelda-cksum
+PROGS += tpl2ppm dol2elf tmd-dump zelda-cksum lego-cksum
 COMMON = tools.o bn.o ec.o
 DEFINES = -DLARGE_FILES -D_FILE_OFFSET_BITS=64
 LIBS = -lcrypto
