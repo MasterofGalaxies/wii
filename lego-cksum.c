@@ -60,7 +60,7 @@ static void save_checksum(u8 *x)
 	for (i = 0; i < len; i++)
 		sum += x[i];
 
-	printf("save: calc = %08x, file = %08x\n", sum, be32(x + len));
+	printf("save: calc = %08x, file = %08x", sum, be32(x + len));
 
 	if (be32(x + len) != sum) {
 		wbe32(x + len, sum);
