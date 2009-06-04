@@ -45,10 +45,12 @@ static void save_checksum(u8 *x)
 	// HACK
 	//
 	// LIJ has longer slots, try it first; if that results in
-	// a 0 in the "file checksum" field, try LSW instead
+	// a 0 in the "file checksum" field, try LSW instead, then LBM
 	slot_len = 0x7fb0;		// LIJ
 	if (be32(x + 0x10 + 4*slot_len) == 0)
 		slot_len = 0x7e7c;	// LSW
+	if (be32(x + 0x10 + 4*slot_len) == 0)
+		slot_len = 0x7e48;	// LBM
 
 
 	for (i = 0; i < 4; i++)
