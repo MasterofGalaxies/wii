@@ -2,6 +2,7 @@
 // Licensed under the terms of the GNU GPL, version 2
 // http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
 
+#include <stdlib.h>
 #include <stdio.h>
 
 #include "tools.h"
@@ -42,15 +43,17 @@ static void save_checksum(u8 *x)
 	u32 i, len;
 	u32 sum;
 
-	// HACK
-	//
-	// LIJ has longer slots, try it first; if that results in
-	// a 0 in the "file checksum" field, try LSW instead, then LBM
-	slot_len = 0x7fb0;		// LIJ
-	if (be32(x + 0x10 + 4*slot_len) == 0)
-		slot_len = 0x7e7c;	// LSW
-	if (be32(x + 0x10 + 4*slot_len) == 0)
-		slot_len = 0x7e48;	// LBM
+	if (slot_len == 0) {
+		// HACK
+		//
+		// LIJ has longer slots, try it first; if that results in
+		// a 0 in the "file checksum" field, try LSW instead, then LBM
+		slot_len = 0x7fb0;		// LIJ
+		if (be32(x + 0x10 + 4*slot_len) == 0)
+			slot_len = 0x7e7c;	// LSW
+		if (be32(x + 0x10 + 4*slot_len) == 0)
+			slot_len = 0x7e48;	// LBM
+	}
 
 
 	for (i = 0; i < 4; i++)
@@ -76,10 +79,13 @@ int main(int argc, char **argv)
 {
 	FILE *fp;
 
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <FILE_V28>\n", argv[0]);
+	if (argc != 2 && argc != 3) {
+		fprintf(stderr, "Usage: %s <FILE_V28> [slot length]\n", argv[0]);
 		return 1;
 	}
+
+	if (argc == 3)
+		slot_len = atoi(argv[2]);
 
 	fp = fopen(argv[1], "rb+");
 	if (!fp)
