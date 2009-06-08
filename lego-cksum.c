@@ -19,7 +19,7 @@ static void slot_checksum(u32 slot)
 
 	len = slot_len - 4;
 
-	if (be32(x + len) == 0) {
+	if (be32(buf + 4*slot) == 0) {
 		printf("slot empty\n");
 		return;
 	}
