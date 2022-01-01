@@ -5,7 +5,7 @@ DEFINES = -DLARGE_FILES -D_FILE_OFFSET_BITS=64
 LIBS = -lcrypto
 
 CC = gcc
-CFLAGS = -Wall -W -Os
+CFLAGS = -Wall -W -O2 -flto
 LDFLAGS =
 
 
